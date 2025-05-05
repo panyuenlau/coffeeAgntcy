@@ -1,5 +1,5 @@
-site_name: IOA Global Coffee
-repo_url: https://github.com/cisco-outshift-ai-agents/ioa-global-coffee
+site_name: Acorda
+repo_url: https://github.com/cisco-outshift-ai-agents/acorda
 repo_name: GitHub
 docs_dir: docs
 
@@ -7,7 +7,9 @@ plugins:
   - search
 
 nav:
-  - README: index.md
+  - README: README.md
+  - CONTRIBUTING: CONTRIBUTING.md
+  - LICENSE: LICENSE
 
 theme:
   name: material
@@ -27,7 +29,7 @@ theme:
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: black
+      primary: custom
       toggle:
         icon: material/weather-night
         name: Switch to dark mode
@@ -35,7 +37,7 @@ theme:
     # Palette toggle for dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: green
+      primary: custom
       toggle:
         icon: material/weather-sunny
         name: Switch to light mode
