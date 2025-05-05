@@ -68,24 +68,14 @@ appreciated**. For detailed contributing guidelines, please see
 --------
 
 ## Documentation
-We provide a documentation site via mkdocs and github pages.
+We provide a documentation site for Acorda, which is hosted on GitHub Pages.
 
-Running the documentation site locally using mkdocs:
-
-Install mkdocs and plugins:
-```sh
-pip install mkdocs
-pip install mkdocs-material
-pip install mkdocs-material-extensions
-pip install markdown-include
+To run the documentation locally, you can use the following command:
+```
+make docs
 ```
 
-Run the server:
-```sh
-./docs.sh
-```
-
-Open the browser to [http://localhost:8000](http://localhost:8000)
+Then open your browser to [http://localhost:8000](http://localhost:8000)
 
 --------
 
