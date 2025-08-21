@@ -16,7 +16,7 @@ jobs:
 
       - name: Copy top-level docs and assets
         run: |
-          mkdir -p ./docs
+          mkdir -p docs/assets
           sed 's/docs\///g' README.md > docs/README.md
           cp CONTRIBUTING.md docs/
           [ -f CHANGELOG.md ] && cp CHANGELOG.md docs/ || true
