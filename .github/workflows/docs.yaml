@@ -2,8 +2,8 @@ name: Deploy docs
 
 on:
   push:
-    branches:
-      - main
+#    branches:
+#      - main
 
 jobs:
   deploy:
@@ -16,6 +16,7 @@ jobs:
 
       - name: Copy top-level docs like README and CONTRIBUTING
         run: |
+          mkdir -p ./docs
           sed 's/docs\///g' README.md > ./docs/README.md
           cp CONTRIBUTING.md ./docs/
 
