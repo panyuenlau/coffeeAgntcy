@@ -34,6 +34,8 @@ logger = logging.getLogger("lungo.colombia_farm_agent.agent")
 # Initialize a multi-protocol, multi-transport agntcy factory.
 factory = AgntcyFactory("lungo_colombia_farm", enable_tracing=True)
 
+MAX_WEATHER_RETRIES = 3
+
 # --- 1. Define Node Names as Constants ---
 class NodeStates:
     SUPERVISOR = "supervisor"
@@ -72,6 +74,11 @@ class FarmAgent:
         """
         Determines the intent of the user's message and routes to the appropriate node.
         """
+
+        if state.get("next_node") == END:
+            logger.info("Supervisor received END signal, terminating workflow.")
+            return {**state, "next_node": END}
+
         if not self.supervisor_llm:
             self.supervisor_llm = get_llm()
 
@@ -95,13 +102,14 @@ class FarmAgent:
 
         if "inventory" in intent:
             # return {"next_node": NodeStates.INVENTORY, "messages": state["messages"]}
-            return {"next_node": NodeStates.WEATHER_FORECAST, "messages": state["messages"]}
+            return {**state, "next_node": NodeStates.WEATHER_FORECAST}
         elif "orders" in intent:
-            return {"next_node": NodeStates.ORDERS, "messages": state["messages"]}
+            return {**state, "next_node": NodeStates.ORDERS}
         else:
-            return {"next_node": NodeStates.GENERAL_RESPONSE, "messages": state["messages"]}
+            return {**state, "next_node": NodeStates.GENERAL_RESPONSE}
         
     async def _get_weather_forecast(self, state: GraphState) -> str:
+        retries = state.get("weather_retries", 0)
 
         # extract location from latest user message
         if not self.weather_forecast_llm:
@@ -168,10 +176,23 @@ class FarmAgent:
 
                 logger.info(f"Weather forecast result: {mcp_call_result}")
                 logger.info(f"Weather forecast result as AIMeessage: {[AIMessage(mcp_call_result)]}")
-                return {"messages": [AIMessage(mcp_call_result)]}
+                return {**state, "messages": [AIMessage(mcp_call_result)]}
         except Exception as e:
-            logger.error(f"Error during MCP tool call: {e}")
-            return {"messages": [AIMessage(f"Error retrieving weather data: {str(e)}")]}
+            retries += 1
+            state["weather_retries"] = retries
+            logger.error(f"Weather forecast error {retries}/{MAX_WEATHER_RETRIES}: {e}")
+            if retries >= MAX_WEATHER_RETRIES:
+                # Give up and end
+                return {**state, "messages": [AIMessage(
+                    f"Error retrieving weather data after {MAX_WEATHER_RETRIES} attempts: {str(e)}")],
+                    "next_node": END, }
+            else:
+                # Retry: re-queue this node
+                return {**state, "messages": [AIMessage(
+                    "Temporary error retrieving weather data, retrying...")],
+                    "next_node": NodeStates.WEATHER_FORECAST,
+                    "weather_retries": retries,  # Pass the counter forward
+                }
         finally:
             pass
 
@@ -202,7 +223,7 @@ class FarmAgent:
 
         logger.info(f"Inventory response generated: {llm_response}")
 
-        return {"messages": [AIMessage(llm_response)]}
+        return {**state, "messages": [AIMessage(llm_response)]}
 
     def _orders_node(self, state: GraphState) -> dict:
         """
@@ -238,14 +259,14 @@ class FarmAgent:
             "order_data": str(mock_order_data) # Pass data as string for LLM context
         }).content
 
-        return {"messages": [AIMessage(llm_response)]}
+        return {**state, "messages": [AIMessage(llm_response)]}
 
     def _general_response_node(self, state: GraphState) -> dict:
         """
         Provides a fallback response for unclear or out-of-scope messages.
         """
         response = "I'm designed to help with inventory and order-related questions. Could you please rephrase your request?"
-        return {"messages": [AIMessage(response)]}
+        return {**state, "messages": [AIMessage(response)]}
 
     # --- Graph Building Method ---
 
@@ -275,11 +296,14 @@ class FarmAgent:
                 NodeStates.ORDERS: NodeStates.ORDERS,
                 NodeStates.GENERAL_RESPONSE: NodeStates.GENERAL_RESPONSE,
                 NodeStates.WEATHER_FORECAST: NodeStates.WEATHER_FORECAST,
+                END: END,
             },
         )
 
         # Add edges from the specific nodes to END
         workflow.add_edge(NodeStates.WEATHER_FORECAST, NodeStates.INVENTORY)
+        # allow retry
+        workflow.add_edge(NodeStates.WEATHER_FORECAST,NodeStates.WEATHER_FORECAST)
         workflow.add_edge(NodeStates.INVENTORY, END)
         workflow.add_edge(NodeStates.ORDERS, END)
         workflow.add_edge(NodeStates.GENERAL_RESPONSE, END)
